@@ -1,15 +1,38 @@
 // Copyright (c) 2014, ultramailman
 // This file is licensed under the MIT License.
 
-
 #include "rhtable.h"
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+
+/* A "slot" is a piece of data containing a key and a value.
+layout of a slot:
+struct slot{
+	struct slot_header header;
+	Key key;
+	Val val;
+};
+Since Key and Val aren't known at compile time, pointer arithmetic is
+required to access key and val.
+*/
 struct slot_header{
 	uint32_t dib;
 	uint32_t hash;
 };
+
+/* The hash table is made of a header and a variable lengthed array
+of slots.
+layout of the hash table:
+struct rhtable{
+	struct rhtable t;
+	                           <- base starts here
+	struct slot tmp;
+	struct slot slots[t.slots];
+};
+Since Key and Val aren't known at compile time, pointer arithmetic is
+required to access the array of slots.
+*/
 struct rhtable{
 	uint32_t slots;
 	uint32_t count;
@@ -18,6 +41,7 @@ struct rhtable{
 	rh_eq eqf;
 };
 
+/* memswap swaps two pieces of non overlapping memory.*/
 static inline
 void memswap_(char * restrict a, char * restrict b, unsigned bytes)
 {
@@ -27,92 +51,79 @@ void memswap_(char * restrict a, char * restrict b, unsigned bytes)
 		b[i] = tmp;
 	}
 }
-static inline
+static
 void memswap(void * restrict a, void * restrict b, unsigned bytes)
 {
 	memswap_(a, b, bytes);
 }
 
-/* size of slot
-struct slot{
-	struct slot_header header;
-	Key key;
-	Val val;
-} packed;
-*/
-static inline
+
+static
 uint32_t slotSize(struct rhtable const * t)
 {
 	return sizeof(struct slot_header) + t->keySize + t->valSize;
 }
 
-/* get the base pointer to raw memory beyond the table header
-struct table{
-	struct rhtable t;
-	                           <- base starts here
-	struct slot tmp;
-	struct slot slots[t.slots];
-};
-*/
-static inline
+
+static
 char * base(struct rhtable const * t)
 {
 	return ((char*)t) + sizeof *t;
 }
 
 /* tmp is a temporary slot to store evicted pairs */
-static inline
+static
 unsigned tmpOffset(struct rhtable const * t)
 {
 	return 0;
 }
-static inline
+static
 struct slot_header * tmpGet(struct rhtable * t)
 {
 	return (struct slot_header *)(base(t) + tmpOffset(t));
 }
 
 /* slots are the memory to store the contents of the hash table */
-static inline
+static
 unsigned slotOffset(struct rhtable const * t, uint32_t i)
 {
 	return slotSize(t) + i * slotSize(t);
 }
-static inline
+static
 struct slot_header * slotGet(struct rhtable const * t, uint32_t i)
 {
 	return (struct slot_header *)(base(t) + slotOffset(t, i));
 }
 ////////////////////////////////////////////////////////////
 /* access the key of a slot */
-static inline
+static
 void * slotGetKey(struct slot_header const * slot, struct rhtable const * t)
 {
 	return ((char *)slot) + sizeof(struct slot_header);
 }
-static inline
+static
 void slotSetKey(struct slot_header * slot, struct rhtable * t, void const * key)
 {
 	memcpy(slotGetKey(slot, t), key, t->keySize);
 }
 /* access the value of a slot*/
-static inline
+static
 void * slotGetVal(struct slot_header const * slot, struct rhtable const * t)
 {
 	return ((char *)slot) + sizeof(struct slot_header) + t->keySize;
 }
-static inline
+static
 void slotSetVal(struct slot_header * slot, struct rhtable * t, void const * val)
 {
 	memcpy(slotGetVal(slot, t), val, t->valSize);
 }
 /* flag to indicate the emptyness of the slot*/
-static inline
+static
 int slotIsEmpty(struct slot_header const* slot)
 {
 	return 0 == (slot->dib + 1);
 }
-static inline
+static
 void slotSetEmpty(struct slot_header * slot)
 {
 	slot->dib = 0;
