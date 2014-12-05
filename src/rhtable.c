@@ -175,8 +175,8 @@ int rhtable_get(struct rhtable const * t, void const * key, void * rkey, void * 
 {
 	uint32_t const hash = t->hashf(key);
 	uint32_t dib = 0;
+	uint32_t probe = (hash + dib) % t->slots;
 	do{
-		uint32_t probe = (hash + dib) % t->slots;
 		struct slot_header * slot = slotGet(t, probe);
 		
 		if(slotIsEmpty(slot) || dib > slot->dib) {
@@ -190,8 +190,13 @@ int rhtable_get(struct rhtable const * t, void const * key, void * rkey, void * 
 				memcpy(rval, slotGetVal(slot, t), t->valSize);
 			}
 			return 1;
+		} else {
+			dib++;
+			probe++;
+			if(probe == t->slots) {
+				probe = 0;
+			}
 		}
-		dib++;
 	}while(dib < t->slots);
 	return 0;
 }
@@ -213,8 +218,10 @@ int rhtable_set_(struct rhtable * t)
 			return 1;
 		} else if(tmp->dib > slot->dib) {
 			memswap(tmp, slot, slotSize(t));
+			tmp->dib++;
+		} else {
+			tmp->dib++;
 		}
-		tmp->dib++;
 	}while( tmp->dib < t->slots );
 	assert(0);
 	return 0;
@@ -246,7 +253,10 @@ void rhtable_del_shift(struct rhtable * t, uint32_t probe)
 		thisSlot->dib--;
 		assert(thisSlot->dib + 1 > 0);
 		
-		next = (next + 1) % t->slots;
+		next++;
+		if(next == t->slots) {
+			next = 0;
+		}
 		thisSlot = nextSlot;
 		nextSlot = slotGet(t, next);
 	}
@@ -255,8 +265,8 @@ void rhtable_del(struct rhtable * t, void const * key)
 {
 	uint32_t const hash = t->hashf(key);
 	uint32_t dib = 0;
+	uint32_t probe = (hash + dib) % t->slots;
 	do{
-		uint32_t probe = (hash + dib) % t->slots;
 		struct slot_header * slot = slotGet(t, probe);
 		
 		if(slotIsEmpty(slot) || dib > slot->dib) {
@@ -269,6 +279,10 @@ void rhtable_del(struct rhtable * t, void const * key)
 			return;
 		} else {
 			dib++;
+			probe++;
+			if(probe == t->slots) {
+				probe = 0;
+			}
 		}
 	}while(dib < t->slots);
 }
