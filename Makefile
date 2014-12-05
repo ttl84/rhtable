@@ -1,9 +1,5 @@
-ifeq ($(OS), Windows_NT)
-	LDFLAGS += -lmingw32
-endif
-
 CC=gcc
-CFLAGS+=-std=c99 -pedantic-errors -Wstrict-aliasing=0 -Wall -g
+CFLAGS+=-std=c99 -pedantic-errors -Wstrict-aliasing=0 -Wall -g -O0
 	
 
 a.out: src/rhtable.o src/test_rhtable.o
