@@ -6,27 +6,34 @@
 #include <stdio.h>
 #include <time.h>
 #define LENGTH 30000
+
+typedef struct{
+	uint32_t n;
+} Key;
+typedef struct{
+	uint64_t index;
+} Val;
 static inline unsigned random(unsigned x)
 {
 	return (x * 16807) % ((2 << 31) - 1);
 }
 
-static int inteqf(void const * int1, void const * int2)
+static int inteqf(void const * aptr, void const * bptr)
 {
-	int const * a = int1;
-	int const * b = int2;
-	return *a == *b;
+	Key const * a = aptr;
+	Key const * b = bptr;
+	return a->n == b->n;
 }
 
 
-static uint32_t inthashf(void const * int1)
+static uint32_t inthashf(void const * ptr)
 {
-	uint32_t x = *(uint32_t*)int1;
-	return x * 65537;
+	Key const * a = ptr;
+	return a->n * 65537;
 }
 
 // random data
-unsigned data [LENGTH];
+Key data [LENGTH];
 unsigned membership[LENGTH];
 void init(void)
 {
@@ -34,7 +41,7 @@ void init(void)
 	for(int i = 0; i < LENGTH; i++)
 	{
 		seed = random(seed);
-		data[i] = seed;
+		data[i].n = seed;
 		membership[i] = 0;
 	}
 }
@@ -58,13 +65,13 @@ void testFind(struct rhtable * t)
 {
 	for(int i = 0; i < LENGTH; i++)
 	{
-		
-		unsigned rkey, rval;
+		Key rkey;
+		Val rval;
 		int found = rhtable_get(t, data + i, &rkey, &rval);
 		if(membership[i]) {
 			assert(found);
-			assert(data[rval] == rkey);
-			assert(data[rval] == data[i]);
+			assert(data[rval.index].n == rkey.n);
+			assert(data[rval.index].n == data[i].n);
 		} else {
 			assert(!found);
 		}
@@ -76,17 +83,19 @@ void testInsert(struct rhtable * t, unsigned begin, unsigned end)
 {
 	for(int i = 0; i < LENGTH; i++)
 	{
-		unsigned key = data[i];
-		unsigned val = i;
+		Key key = data[i];
+		Val val = {i};
 		int good = rhtable_set(t, &key, &val);
 		if(good)
 		{
-			unsigned rkey;
-			unsigned rval;
+			Key rkey;
+			Val rval;
 			int found = rhtable_get(t, data + i, &rkey, &rval);
 			assert(found);
-			assert(rkey == key);
-			assert(rval == val);
+			assert(rkey.n == key.n);
+			assert(rval.index == val.index);
+			assert(data[rval.index].n == rkey.n);
+			assert(data[rval.index].n == data[i].n);
 			membership[i] = 1;
 		}
 		else
@@ -109,19 +118,18 @@ static
 void testIterator(struct rhtable * t)
 {
 	rh_for(t, iter) {
-		unsigned rkey, i;
-		assert(rhtable_get(t, iter.key, &rkey, &i));
-		assert(rkey == data[i]);
-		assert(membership[i]);
+		Key rkey;
+		Val rval;
+		assert(rhtable_get(t, iter.key, &rkey, &rval));
+		assert(rkey.n == data[rval.index].n);
+		assert(membership[rval.index]);
 	}
 }
 int main(void)
 {
 	init();
-	struct rhtable * t = RHTABLE_CREATE(
+	struct rhtable * t = RHTABLE_CREATE(Key, Val, 
 		.slots = LENGTH,
-		.keySize = sizeof(unsigned),
-		.valSize = sizeof(unsigned),
 		.hashf = inthashf,
 		.eqf = inteqf
 	);

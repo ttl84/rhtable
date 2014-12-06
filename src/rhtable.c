@@ -6,20 +6,7 @@
 #include <string.h>
 #include <assert.h>
 
-/* A "slot" is a piece of data containing a key and a value.
-layout of a slot:
-struct slot{
-	struct slot_header header;
-	Key key;
-	Val val;
-};
-Since Key and Val aren't known at compile time, pointer arithmetic is
-required to access key and val.
-*/
-struct slot_header{
-	uint32_t dib;
-	uint32_t hash;
-};
+
 
 /* The hash table is made of a header and a variable lengthed array
 of slots.
@@ -36,9 +23,13 @@ required to access the array of slots.
 struct rhtable{
 	uint32_t slots;
 	uint32_t count;
+	
+	uint32_t slotSize;
 	uint32_t keySize, valSize;
-	rh_hash hashf;
+	uint32_t keyOffset, valOffset;
+	
 	rh_eq eqf;
+	rh_hash hashf;
 };
 
 /* memswap swaps two pieces of non overlapping memory.*/
@@ -61,7 +52,7 @@ void memswap(void * restrict a, void * restrict b, unsigned bytes)
 static
 uint32_t slotSize(struct rhtable const * t)
 {
-	return sizeof(struct slot_header) + t->keySize + t->valSize;
+	return t->slotSize;
 }
 
 
@@ -99,7 +90,7 @@ struct slot_header * slotGet(struct rhtable const * t, uint32_t i)
 static
 void * slotGetKey(struct slot_header const * slot, struct rhtable const * t)
 {
-	return ((char *)slot) + sizeof(struct slot_header);
+	return ((char *)slot) + t->keyOffset;
 }
 static
 void slotSetKey(struct slot_header * slot, struct rhtable * t, void const * key)
@@ -110,7 +101,7 @@ void slotSetKey(struct slot_header * slot, struct rhtable * t, void const * key)
 static
 void * slotGetVal(struct slot_header const * slot, struct rhtable const * t)
 {
-	return ((char *)slot) + sizeof(struct slot_header) + t->keySize;
+	return ((char *)slot) + t->valOffset;
 }
 static
 void slotSetVal(struct slot_header * slot, struct rhtable * t, void const * val)
@@ -141,7 +132,7 @@ uint32_t rhtable_slots(struct rhtable const * t)
 }
 float rhtable_average_dib(struct rhtable const * t)
 {
-	float dibs;
+	float dibs = 0;
 	for(uint32_t i = 0; i < t->slots; i++) {
 		struct slot_header * slot = slotGet(t, i);
 		if(!slotIsEmpty(slot)) {
@@ -150,7 +141,7 @@ float rhtable_average_dib(struct rhtable const * t)
 	}
 	return dibs / t->count;
 }
-struct rhtable * rhtable_create(struct rhspec const spec)
+struct rhtable * rhtable_create_(struct rhspec const spec)
 {
 	if(spec.slots < 2) {
 		return NULL;
@@ -161,14 +152,25 @@ struct rhtable * rhtable_create(struct rhspec const spec)
 	} else if(spec.eqf == NULL) {
 		return NULL;
 	}
-	struct rhtable * t = calloc(1, sizeof *t + (1 + spec.slots) * (sizeof(struct slot_header) + 
-		spec.keySize + 
-		spec.valSize));
+	
+	uint32_t tableSize= 0;
+	tableSize += sizeof(struct rhtable);
+	tableSize += spec.slotSize;
+	tableSize += spec.slots * spec.slotSize;
+	
+	struct rhtable * t = calloc(1, tableSize);
 	if(t != NULL) {
-		t->slots = spec.slots;
 		t->count = 0;
+		
+		t->slots = spec.slots;
+		
+		t->slotSize = spec.slotSize;
 		t->keySize = spec.keySize;
 		t->valSize = spec.valSize;
+		
+		t->keyOffset = spec.keyOffset;
+		t->valOffset = spec.valOffset;
+		
 		t->hashf = spec.hashf;
 		t->eqf = spec.eqf;
 		for(uint32_t i = 0; i < spec.slots; i++) {

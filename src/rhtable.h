@@ -4,8 +4,7 @@
 #ifndef RHTABLE_H
 #define RHTABLE_H
 #include <stdint.h>
-/* Generic hash table.*/
-struct rhtable;
+#include <stddef.h>
 
 /* this callback should return non zero for equality*/
 typedef int (*rh_eq)(void const *, void const *);
@@ -13,18 +12,54 @@ typedef int (*rh_eq)(void const *, void const *);
 /* this is a hash function callback*/
 typedef uint32_t (*rh_hash)(void const *);
 
-/* too many parameters for table creation, so pass this structure instead*/
+/* Generic hash table.*/
+struct rhtable;
+
+/* A "slot" is a piece of data containing a key and a value.
+layout of a slot:
+Since Key and Val aren't known at compile time,
+pointer arithmetic and memcpy are needed
+*/
+struct slot_header{
+	uint32_t dib;
+	uint32_t hash;
+};
+#define SLOT(keyType, valType)\
+	struct{\
+		struct slot_header header;\
+		keyType key;\
+		valType val;\
+	}
+
+/* rhspec specifies the layout of the hash table and its slots.
+There are too many integers parameters, so using a struct makes
+it easier to pass in parameters.*/
 struct rhspec{
-	uint32_t slots, keySize, valSize;
+	uint32_t slots;
+	uint32_t slotSize;
+	uint32_t keySize, keyOffset;
+	uint32_t valSize, valOffset;
 	rh_eq eqf;
 	rh_hash hashf;
 };
+/* macro to initialize rhspec*/
+#define RHSPEC_CREATE(keyType, valType, ...)\
+	(struct rhspec){\
+		.keySize = sizeof(keyType),\
+		.keyOffset = offsetof(SLOT(keyType, valType), key),\
+		.valSize = sizeof(valType),\
+		.valOffset = offsetof(SLOT(keyType, valType), val),\
+		.slotSize = sizeof(SLOT(keyType, valType)),\
+		__VA_ARGS__\
+		}
+
 /* create a new hash table
 returns null pointer if it fails.
+Using the macro to create a new rhtable would be the best.
 */
-struct rhtable * rhtable_create(struct rhspec spec);
-#define RHTABLE_CREATE(...)\
-	rhtable_create((struct rhspec){__VA_ARGS__})
+struct rhtable * rhtable_create_(struct rhspec spec);
+#define RHTABLE_CREATE(keyType, valType, ...)\
+	rhtable_create_(RHSPEC_CREATE(keyType, valType, __VA_ARGS__))
 
 void rhtable_destroy(struct rhtable * t);
 
