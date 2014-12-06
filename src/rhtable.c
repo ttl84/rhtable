@@ -260,7 +260,7 @@ void rhtable_del_shift(struct rhtable * t, uint32_t probe)
 	struct slot_header * thisSlot = slotGet(t, probe);
 	struct slot_header * nextSlot = slotGet(t, next);
 	while(!slotIsEmpty(nextSlot) && nextSlot->dib != 0) {
-		memswap(thisSlot, nextSlot, slotSize(t));
+		memcpy(thisSlot, nextSlot, slotSize(t));
 		thisSlot->dib--;
 		assert(thisSlot->dib + 1 > 0);
 		
@@ -271,6 +271,7 @@ void rhtable_del_shift(struct rhtable * t, uint32_t probe)
 		thisSlot = nextSlot;
 		nextSlot = slotGet(t, next);
 	}
+	slotSetEmpty(thisSlot);
 }
 void rhtable_del(struct rhtable * t, void const * key)
 {
