@@ -1,7 +1,12 @@
 CC=gcc
-CFLAGS+=-std=c99 -pedantic-errors -Wstrict-aliasing=0 -Wall -g -O0
+CFLAGS+=-std=c99 -pedantic-errors -Wstrict-aliasing=0 -Wall -g -O2
 	
 all: a.out librhtable.a
+
+install: librhtable.a
+	mkdir /usr/include/rhtable
+	cp librhtable.a /usr/lib
+	cp src/rhtable.h /usr/include/rhtable
 
 a.out:  src/test_rhtable.o librhtable.a
 	$(CC) -o $@ $< -L"./" -lrhtable
