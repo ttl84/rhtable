@@ -99,9 +99,9 @@ struct rhiter{
 struct rhiter rhtable_begin(struct rhtable const * t);
 
 /* get the next item*/
-struct rhiter rhtable_next(struct rhtable const * t, struct rhiter const * iter);
+void rhtable_next(struct rhtable const * t, struct rhiter * iter);
 
 /* convenient for loop macro to iterate*/
 #define rh_for(ptr, iter)\
-	for(struct rhiter iter = rhtable_begin(ptr); iter.key; iter = rhtable_next((ptr), &iter))
+	for(struct rhiter iter = rhtable_begin(ptr); iter.key; rhtable_next((ptr), &iter))
 #endif

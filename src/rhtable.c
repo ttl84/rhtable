@@ -320,9 +320,9 @@ struct rhiter rhtable_next_(struct rhtable const * t, uint32_t i)
 		.i = t->slots
 	};
 }
-struct rhiter rhtable_next(struct rhtable const * t, struct rhiter const * iter)
+void rhtable_next(struct rhtable const * t, struct rhiter * iter)
 {
-	return rhtable_next_(t, iter->i + 1);
+	*iter = rhtable_next_(t, iter->i + 1);
 }
 
 struct rhiter rhtable_begin(struct rhtable const * t)
