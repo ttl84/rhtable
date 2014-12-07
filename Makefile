@@ -4,7 +4,7 @@ CFLAGS+=-std=c99 -pedantic-errors -Wstrict-aliasing=0 -Wall -g -O2
 all: a.out librhtable.a
 
 install: librhtable.a
-	mkdir /usr/include/rhtable
+	mkdir -p /usr/include/rhtable
 	cp librhtable.a /usr/lib
 	cp src/rhtable.h /usr/include/rhtable
 
