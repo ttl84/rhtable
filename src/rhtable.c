@@ -30,6 +30,8 @@ struct rhtable{
 	
 	rh_eq eqf;
 	rh_hash hashf;
+	
+	char base [];
 };
 
 /* memswap swaps two pieces of non overlapping memory.*/
@@ -56,12 +58,6 @@ uint32_t slotSize(struct rhtable const * t)
 }
 
 
-static
-char * base(struct rhtable const * t)
-{
-	return ((char*)t) + sizeof *t;
-}
-
 /* tmp is a temporary slot to store evicted pairs */
 static
 unsigned tmpOffset(struct rhtable const * t)
@@ -71,7 +67,7 @@ unsigned tmpOffset(struct rhtable const * t)
 static
 struct slot_header * tmpGet(struct rhtable * t)
 {
-	return (struct slot_header *)(base(t) + tmpOffset(t));
+	return (struct slot_header *)(t->base + tmpOffset(t));
 }
 
 /* slots are the memory to store the contents of the hash table */
@@ -83,7 +79,7 @@ unsigned slotOffset(struct rhtable const * t, uint32_t i)
 static
 struct slot_header * slotGet(struct rhtable const * t, uint32_t i)
 {
-	return (struct slot_header *)(base(t) + slotOffset(t, i));
+	return (struct slot_header *)(t->base + slotOffset(t, i));
 }
 ////////////////////////////////////////////////////////////
 /* access the key of a slot */
