@@ -14,7 +14,8 @@ to generate typesafe versions of the table. It's like c++ templates in c.
 
 The code uses c99 features.
 
-Operations:
+Operations
+
 create(Key, Val, slots, hash, eq)
 	initialize a table that uses Key and Val types.
 	slots is the maximum number of mappings this table can hold.
