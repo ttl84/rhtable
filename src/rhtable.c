@@ -192,6 +192,7 @@ int rhtable_get(struct rhtable const * t, void const * key, void * rkey, void * 
 	}while(dib < t->slots);
 	return 0;
 }
+// find the next empty slot
 static
 uint32_t nextEmpty(struct rhtable * t, uint32_t probe)
 {
@@ -207,6 +208,7 @@ uint32_t nextEmpty(struct rhtable * t, uint32_t probe)
 		}
 	}while(1);
 }
+// shift array to the right until an empty slot is probed
 static
 void rightShift(struct rhtable * t, uint32_t probe)
 {
@@ -228,6 +230,7 @@ void rightShift(struct rhtable * t, uint32_t probe)
 		dst = src;
 	}while(src != probe);
 }
+// insert a new item or update an existing item
 static
 int rhtable_set_(struct rhtable * t)
 {
