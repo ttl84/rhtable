@@ -210,6 +210,42 @@ int rhtable_get(struct rhtable const * t, void const * key, void * rkey, void * 
 	return 0;
 }
 static
+uint32_t nextEmpty(struct rhtable * t, uint32_t probe)
+{
+	do{
+		struct slot_header * slot = slotGet(t, probe);
+		if(slotIsEmpty(slot)){
+			return probe;
+		}
+		
+		probe++;
+		if(probe == t->slots) {
+			probe = 0;
+		}
+	}while(1);
+}
+static
+void rightShift(struct rhtable * t, uint32_t probe)
+{
+	uint32_t dst = nextEmpty(t, probe);
+	uint32_t src;
+	
+	
+	do{
+		src = dst - 1;
+		if(src > dst) {
+			src = t->slots - 1;
+		}
+		struct slot_header * dstSlot = slotGet(t, dst);
+		struct slot_header * srcSlot = slotGet(t, src);
+		
+		srcSlot->dib++;
+		memcpy(dstSlot, srcSlot, slotSize(t));
+		
+		dst = src;
+	}while(src != probe);
+}
+static
 int rhtable_set_(struct rhtable * t)
 {
 	struct slot_header * const tmp = tmpGet(t);
@@ -226,8 +262,10 @@ int rhtable_set_(struct rhtable * t)
 			slotSetVal(slot, t, slotGetVal(tmp, t));
 			return 1;
 		} else if(tmp->dib > slot->dib) {
-			memswap(tmp, slot, slotSize(t));
-			tmp->dib++;
+			rightShift(t, probe);
+			memcpy(slot, tmp, slotSize(t));
+			t->count++;
+			return 1;
 		} else {
 			tmp->dib++;
 		}
