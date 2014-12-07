@@ -34,23 +34,6 @@ struct rhtable{
 	char base [];
 };
 
-/* memswap swaps two pieces of non overlapping memory.*/
-static inline
-void memswap_(char * restrict a, char * restrict b, unsigned bytes)
-{
-	for(unsigned i = 0; i < bytes; i++) {
-		char tmp = a[i];
-		a[i] = b[i];
-		b[i] = tmp;
-	}
-}
-static
-void memswap(void * restrict a, void * restrict b, unsigned bytes)
-{
-	memswap_(a, b, bytes);
-}
-
-
 static
 uint32_t slotSize(struct rhtable const * t)
 {
