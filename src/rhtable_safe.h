@@ -45,7 +45,7 @@ static inline uint32_t name##_count(name t)\
 {	return rhtable_count(t.ptr); }\
 static inline uint32_t name##_slots(name t)\
 {	return rhtable_slots(t.ptr); }\
-static inline uint32_t name##_average_dib(name t)\
+static inline float name##_average_dib(name t)\
 {	return rhtable_average_dib(t.ptr); }\
 typedef struct{\
 	Key const * key;\
