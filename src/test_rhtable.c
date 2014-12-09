@@ -128,10 +128,14 @@ void testIterator(hashtable t)
 		assert(membership[rval.index]);
 	}
 }
-int main(void)
+int main(int argc, char ** argv)
 {
 	init();
-	hashtable t = hashtable_create(LENGTH);
+	unsigned size = 45001;
+	if(argc == 2) {
+		sscanf(argv[1], "%ud", &size);
+	}
+	hashtable t = hashtable_create(size);
 	
 	clock_t t1 = clock();
 	testInsert(t, 0, LENGTH);
