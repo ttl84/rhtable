@@ -21,29 +21,15 @@ Since Key and Val aren't known at compile time, pointer arithmetic is
 required to access the array of slots.
 */
 struct rhtable{
-	uint32_t slots;
+	struct rhspec const spec;
 	uint32_t count;
-	
-	uint32_t slotSize;
-	uint32_t keySize, valSize;
-	uint32_t keyOffset, valOffset;
-	
-	rh_eq eqf;
-	rh_hash hashf;
 	
 	char base [];
 };
 
-static
-uint32_t slotSize(struct rhtable const * t)
-{
-	return t->slotSize;
-}
-
-
 /* tmp is a temporary slot to store evicted pairs */
 static
-unsigned tmpOffset(struct rhtable const * t)
+uint32_t tmpOffset(struct rhtable const * t)
 {
 	return 0;
 }
@@ -55,9 +41,10 @@ struct slot_header * tmpGet(struct rhtable * t)
 
 /* slots are the memory to store the contents of the hash table */
 static
-unsigned slotOffset(struct rhtable const * t, uint32_t i)
+uint32_t slotOffset(struct rhtable const * t, uint32_t i)
 {
-	return slotSize(t) + i * slotSize(t);
+	struct rhspec const s = t->spec;
+	return s.slotSize + i * s.slotSize;
 }
 static
 struct slot_header * slotGet(struct rhtable const * t, uint32_t i)
@@ -69,23 +56,27 @@ struct slot_header * slotGet(struct rhtable const * t, uint32_t i)
 static
 void * slotGetKey(struct slot_header const * slot, struct rhtable const * t)
 {
-	return ((char *)slot) + t->keyOffset;
+	struct rhspec const s = t->spec;
+	return ((char *)slot) + s.keyOffset;
 }
 static
 void slotSetKey(struct slot_header * slot, struct rhtable * t, void const * key)
 {
-	memcpy(slotGetKey(slot, t), key, t->keySize);
+	struct rhspec const s = t->spec;
+	memcpy(slotGetKey(slot, t), key, s.keySize);
 }
 /* access the value of a slot*/
 static
 void * slotGetVal(struct slot_header const * slot, struct rhtable const * t)
 {
-	return ((char *)slot) + t->valOffset;
+	struct rhspec const s = t->spec;
+	return ((char *)slot) + s.valOffset;
 }
 static
 void slotSetVal(struct slot_header * slot, struct rhtable * t, void const * val)
 {
-	memcpy(slotGetVal(slot, t), val, t->valSize);
+	struct rhspec const s = t->spec;
+	memcpy(slotGetVal(slot, t), val, s.valSize);
 }
 /* flag to indicate the emptyness of the slot*/
 static
@@ -107,12 +98,12 @@ uint32_t rhtable_count(struct rhtable const * t)
 
 uint32_t rhtable_slots(struct rhtable const * t)
 {
-	return t->slots;
+	return t->spec.slots;
 }
 float rhtable_average_dib(struct rhtable const * t)
 {
 	float dibs = 0;
-	for(uint32_t i = 0; i < t->slots; i++) {
+	for(uint32_t i = 0; i < rhtable_slots(t); i++) {
 		struct slot_header * slot = slotGet(t, i);
 		if(!slotIsEmpty(slot)) {
 			dibs += slot->dib;
@@ -139,19 +130,8 @@ struct rhtable * rhtable_create_(struct rhspec const spec)
 	
 	struct rhtable * t = calloc(1, tableSize);
 	if(t != NULL) {
-		t->count = 0;
-		
-		t->slots = spec.slots;
-		
-		t->slotSize = spec.slotSize;
-		t->keySize = spec.keySize;
-		t->valSize = spec.valSize;
-		
-		t->keyOffset = spec.keyOffset;
-		t->valOffset = spec.valOffset;
-		
-		t->hashf = spec.hashf;
-		t->eqf = spec.eqf;
+		struct rhtable tmp = {.spec = spec};
+		memcpy(t, &tmp, sizeof tmp);
 		for(uint32_t i = 0; i < spec.slots; i++) {
 			struct slot_header * slot = slotGet(t, i);
 			slotSetEmpty(slot);
@@ -165,37 +145,38 @@ void rhtable_destroy(struct rhtable * t)
 }
 int rhtable_get(struct rhtable const * t, void const * key, void * rkey, void * rval)
 {
-	uint32_t const hash = t->hashf(key);
+	struct rhspec const s = t->spec;
+	uint32_t const hash = s.hashf(key);
 	uint32_t dib = 0;
-	uint32_t probe = (hash + dib) % t->slots;
+	uint32_t probe = (hash + dib) % s.slots;
 	do{
 		struct slot_header * slot = slotGet(t, probe);
 		
 		if(slotIsEmpty(slot) || dib > slot->dib) {
 			return 0;
-		} else if(hash == slot->hash &&
-		t->eqf(key, slotGetKey(slot, t))) {
+		} else if(hash == slot->hash && s.eqf(key, slotGetKey(slot, t))) {
 			if(rkey != NULL) {
-				memcpy(rkey, slotGetKey(slot, t), t->keySize);
+				memcpy(rkey, slotGetKey(slot, t), s.keySize);
 			}
-			if(t->valSize > 0 && rval != NULL) {
-				memcpy(rval, slotGetVal(slot, t), t->valSize);
+			if(s.valSize > 0 && rval != NULL) {
+				memcpy(rval, slotGetVal(slot, t), s.valSize);
 			}
 			return 1;
 		} else {
 			dib++;
 			probe++;
-			if(probe == t->slots) {
+			if(probe == s.slots) {
 				probe = 0;
 			}
 		}
-	}while(dib < t->slots);
+	}while(dib < s.slots);
 	return 0;
 }
 // find the next empty slot
 static
 uint32_t nextEmpty(struct rhtable * t, uint32_t probe)
 {
+	struct rhspec const s = t->spec;
 	do{
 		struct slot_header * slot = slotGet(t, probe);
 		if(slotIsEmpty(slot)){
@@ -203,7 +184,7 @@ uint32_t nextEmpty(struct rhtable * t, uint32_t probe)
 		}
 		
 		probe++;
-		if(probe == t->slots) {
+		if(probe == s.slots) {
 			probe = 0;
 		}
 	}while(1);
@@ -212,6 +193,7 @@ uint32_t nextEmpty(struct rhtable * t, uint32_t probe)
 static
 void rightShift(struct rhtable * t, uint32_t probe)
 {
+	struct rhspec const s = t->spec;
 	uint32_t dst = nextEmpty(t, probe);
 	uint32_t src;
 	
@@ -219,13 +201,13 @@ void rightShift(struct rhtable * t, uint32_t probe)
 	do{
 		src = dst - 1;
 		if(src > dst) {
-			src = t->slots - 1;
+			src = s.slots - 1;
 		}
 		struct slot_header * dstSlot = slotGet(t, dst);
 		struct slot_header * srcSlot = slotGet(t, src);
 		
 		srcSlot->dib++;
-		memcpy(dstSlot, srcSlot, slotSize(t));
+		memcpy(dstSlot, srcSlot, s.slotSize);
 		
 		dst = src;
 	}while(src != probe);
@@ -234,42 +216,42 @@ void rightShift(struct rhtable * t, uint32_t probe)
 static
 int rhtable_set_(struct rhtable * t)
 {
+	struct rhspec const s = t->spec;
 	struct slot_header * const tmp = tmpGet(t);
 	do{
-		uint32_t probe = (tmp->hash + tmp->dib) % t->slots;
+		uint32_t probe = (tmp->hash + tmp->dib) % s.slots;
 		struct slot_header * slot = slotGet(t, probe);
 		
 		if(slotIsEmpty(slot)) {
-			memcpy(slot, tmp, slotSize(t));
+			memcpy(slot, tmp, s.slotSize);
 			t->count++;
 			return 1;
-		} else if(tmp->hash == slot->hash && 
-		t->eqf(slotGetKey(tmp, t), slotGetKey(slot, t))) {
+		} else if(tmp->hash == slot->hash && s.eqf(slotGetKey(tmp, t), slotGetKey(slot, t))) {
 			slotSetVal(slot, t, slotGetVal(tmp, t));
 			return 1;
 		} else if(tmp->dib > slot->dib) {
 			rightShift(t, probe);
-			memcpy(slot, tmp, slotSize(t));
+			memcpy(slot, tmp, s.slotSize);
 			t->count++;
 			return 1;
 		} else {
 			tmp->dib++;
 		}
-	}while( tmp->dib < t->slots );
+	}while( tmp->dib < s.slots );
 	assert(0);
 	return 0;
 }
 int rhtable_set(struct rhtable * t, void const * key, void const * val)
 {
-
-	if(t->count == t->slots) {
+	struct rhspec const s = t->spec;
+	if(t->count == s.slots) {
 		return 0;
 	}
 	
 	struct slot_header * const tmp = tmpGet(t);
 	
 	tmp->dib = 0;
-	tmp->hash = t->hashf(key);
+	tmp->hash = s.hashf(key);
 	slotSetKey(tmp, t, key);
 	slotSetVal(tmp, t, val);
 	
@@ -278,16 +260,17 @@ int rhtable_set(struct rhtable * t, void const * key, void const * val)
 static
 void rhtable_del_shift(struct rhtable * t, uint32_t probe)
 {
-	uint32_t next = (probe + 1) % t->slots;
+	struct rhspec const s = t->spec;
+	uint32_t next = (probe + 1) % s.slots;
 	struct slot_header * thisSlot = slotGet(t, probe);
 	struct slot_header * nextSlot = slotGet(t, next);
 	while(!slotIsEmpty(nextSlot) && nextSlot->dib != 0) {
-		memcpy(thisSlot, nextSlot, slotSize(t));
+		memcpy(thisSlot, nextSlot, s.slotSize);
 		thisSlot->dib--;
 		assert(thisSlot->dib + 1 > 0);
 		
 		next++;
-		if(next == t->slots) {
+		if(next == s.slots) {
 			next = 0;
 		}
 		thisSlot = nextSlot;
@@ -297,16 +280,16 @@ void rhtable_del_shift(struct rhtable * t, uint32_t probe)
 }
 void rhtable_del(struct rhtable * t, void const * key)
 {
-	uint32_t const hash = t->hashf(key);
+	struct rhspec const s = t->spec;
+	uint32_t const hash = s.hashf(key);
 	uint32_t dib = 0;
-	uint32_t probe = (hash + dib) % t->slots;
+	uint32_t probe = (hash + dib) % s.slots;
 	do{
 		struct slot_header * slot = slotGet(t, probe);
 		
 		if(slotIsEmpty(slot) || dib > slot->dib) {
 			return;
-		} else if(hash == slot->hash &&
-			t->eqf(key, slotGetKey(slot, t))) {
+		} else if(hash == slot->hash && s.eqf(key, slotGetKey(slot, t))) {
 			slotSetEmpty(slot);
 			t->count--;
 			rhtable_del_shift(t, probe);
@@ -314,17 +297,18 @@ void rhtable_del(struct rhtable * t, void const * key)
 		} else {
 			dib++;
 			probe++;
-			if(probe == t->slots) {
+			if(probe == s.slots) {
 				probe = 0;
 			}
 		}
-	}while(dib < t->slots);
+	}while(dib < s.slots);
 }
 
 static
 struct rhiter rhtable_next_(struct rhtable const * t, uint32_t i)
 {
-	for(; i < t->slots; i++) {
+	struct rhspec const s = t->spec;
+	for(; i < s.slots; i++) {
 		struct slot_header * slot = slotGet(t, i);
 		if(!slotIsEmpty(slot)) {
 			return (struct rhiter) {
@@ -337,7 +321,7 @@ struct rhiter rhtable_next_(struct rhtable const * t, uint32_t i)
 	return (struct rhiter) {
 		.key = NULL,
 		.val = NULL,
-		.i = t->slots
+		.i = s.slots
 	};
 }
 void rhtable_next(struct rhtable const * t, struct rhiter * iter)
