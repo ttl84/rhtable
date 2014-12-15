@@ -104,4 +104,11 @@ void rhtable_next(struct rhtable const * t, struct rhiter * iter);
 /* convenient for loop macro to iterate*/
 #define rh_for(ptr, iter)\
 	for(struct rhiter iter = rhtable_begin(ptr); iter.key; rhtable_next((ptr), &iter))
+
+/* resizes the table if possible.
+returns a null if it fails.
+returns a pointer to a table if succesful.
+The previous pointer may become invalid if resize is successful.
+*/
+struct rhtable * rhtable_resize(struct rhtable * t, uint32_t slots);
 #endif

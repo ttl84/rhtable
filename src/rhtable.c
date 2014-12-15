@@ -333,3 +333,26 @@ struct rhiter rhtable_begin(struct rhtable const * t)
 {
 	return rhtable_next_(t, 0);
 }
+
+struct rhtable * rhtable_resize(struct rhtable * t, uint32_t slots)
+{
+	struct rhspec s = t->spec;
+	if(slots == 0) {
+		return NULL;
+	} else if(slots < t->count) {
+		return NULL;
+	} else if(slots == s.slots) {
+		return t;
+	}
+	s.slots = slots;
+	struct rhtable * new = rhtable_create_(s);
+	if(new == NULL) {
+		return NULL;
+	}
+	rh_for(t, iter) {
+		int good = rhtable_set(new, iter.key, iter.val);
+		assert(good);
+	}
+	rhtable_destroy(t);
+	return new;
+}

@@ -49,7 +49,7 @@ void init(void)
 }
 
 static 
-void testRemoval(hashtable t, unsigned begin, unsigned end)
+void testRemoval(hashtable * t, unsigned begin, unsigned end)
 {
 	for(unsigned i = begin; i < end; i++) {
 		int found = hashtable_get(t, data + i, 0, 0);
@@ -64,7 +64,7 @@ void testRemoval(hashtable t, unsigned begin, unsigned end)
 	}
 }
 static 
-void testFind(hashtable t)
+void testFind(hashtable * t)
 {
 	for(int i = 0; i < LENGTH; i++)
 	{
@@ -82,7 +82,7 @@ void testFind(hashtable t)
 }
 
 static
-void testInsert(hashtable t, unsigned begin, unsigned end)
+void testInsert(hashtable * t, unsigned begin, unsigned end)
 {
 	for(int i = 0; i < LENGTH; i++)
 	{
@@ -118,7 +118,7 @@ void testInsert(hashtable t, unsigned begin, unsigned end)
 	fprintf(stdout, "average dib: %f\n\n", averageDib);
 }
 static 
-void testIterator(hashtable t)
+void testIterator(hashtable * t)
 {
 	rh_for_safe(hashtable, t, iter) {
 		Key rkey;
@@ -138,10 +138,10 @@ int main(int argc, char ** argv)
 	hashtable t = hashtable_create(size);
 	
 	clock_t t1 = clock();
-	testInsert(t, 0, LENGTH);
-	testFind(t);
-	testIterator(t);
-	testRemoval(t, 0, LENGTH);
+	testInsert(&t, 0, LENGTH);
+	testFind(&t);
+	testIterator(&t);
+	testRemoval(&t, 0, LENGTH);
 	clock_t t2 = clock();
 	
 	printf("time: %lu\n", t2 - t1);
